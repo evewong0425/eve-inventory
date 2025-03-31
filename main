@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>德國橋牌計分器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #7C1E13;
+      --secondary: #1C3144;
+      --accent: #D4AF37;
+      --light-bg: #F4EBD9;
+      --dark-bg: #2A2730;
+      --pixel-size: 2px;
+    }
+    
+    /* 自定義確認對話框樣式 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    .modal-content {
+      background-color: var(--light-bg);
+      padding: 20px;
+      border: var(--pixel-size) solid var(--secondary);
+      box-shadow: var(--pixel-size) var(--pixel-size) 0 0 var(--secondary);
+      max-width: 90%;
+      width: 400px;
+    }
+    
+    .dark .modal-content {
+      background-color: var(--dark-bg);
+      border-color: var(--light-bg);
+      box-shadow: var(--pixel-size) var(--pixel-size) 0 0 var(--light-bg);
+    }
+    
+    .first-bidder {
+      position: relative;
+    }
+    
+    .first-bidder::before {
+      content: "⭐";
+      position: absolute;
+      left: -20px;
+      font-size: 1rem;
+    }
+    
+    body {
+      font-family: 'VT323', monospace;
+      background-color: var(--light-bg);
+      color: var(--secondary);
+    }
+    
+    .dark body {
+      background-color: var(--dark-bg);
+      color: var(--light-bg);
+    }
+    
+    .pixel-border {
+      position: relative;
+      border: var(--pixel-size) solid var(--secondary);
+      box-shadow: var(--pixel-size) var(--pixel-size) 0 0 var(--secondary);
+    }
+    
+    .dark .pixel-border {
+      border-color: var(--light-bg);
+      box-shadow: var(--pixel-size) var(--pixel-size) 0 0 var(--light-bg);
+    }
+    
+    .pixel-button {
+      background-color: var(--accent);
+      color: var(--secondary);
+      border: var(--pixel-size) solid var(--secondary);
+      box-shadow: var(--pixel-size) var(--pixel-size) 0 0 var(--secondary);
+      transition: all 0.1s;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+    
+    .pixel-button:hover {
+      transform: translate(1px, 1px);
+      box-shadow: calc(var(--pixel-size) - 1px) calc(var(--pixel-size) - 1px) 0 0 var(--secondary);
+    }
+    
+    .pixel-button:active {
+      transform: translate(var(--pixel-size), var(--pixel-size));
+      box-shadow: none;
+    }
+    
+    .dark .pixel-button {
+      border-color: var(--light-bg);
+      box-shadow: var(--pixel-size) var(--pixel-size) 0 0 var(--light-bg);
+    }
+    
+    .dark .pixel-button:hover {
+      box-shadow: calc(var(--pixel-size) - 1px) calc(var(--pixel-size) - 1px) 0 0 var(--light-bg);
+    }
+    
+    .suit {
+      font-size: 1.5rem;
+    }
+    
+    .spades { color: #000000; }
+    .hearts { color: #FF0000; }
+    .diamonds { color: #FF0000; }
+    .clubs { color: #000000; }
+    
+    .dark .spades, .dark .clubs { color: #FFFFFF; }
+    
+    .just-made {
+      color: #006400;
+      font-weight: bold;
+    }
+    
+    .dark .just-made {
+      color: #00FF00;
+    }
+    
+    .missed {
+      color: #8B0000;
+      font-weight: bold;
+    }
+    
+    .dark .missed {
+      color: #FF6347;
+    }
+    
+    /* Input styling */
+    input[type="text"], input[type="number"], select {
+      background-color: var(--light-bg);
+      border: var(--pixel-size) solid var(--secondary);
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      padding: 6px 10px;
+      outline: none;
+    }
+    
+    .dark input[type="text"], .dark input[type="number"], .dark select {
+      background-color: var(--dark-bg);
+      color: var(--light-bg);
+      border-color: var(--light-bg);
+    }
+    
+    input[type="number"] {
+      width: 60px;
+      text-align: center;
+    }
+    
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    
+    th, td {
+      border: var(--pixel-size) solid var(--secondary);
+      padding: 8px 12px;
+    }
+    
+    .dark th, .dark td {
+      border-color: var(--light-bg);
+    }
+    
+    th {
+      background-color: var(--primary);
+      color: var(--light-bg);
+    }
+    
+    tr:nth-child(even) {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+    
+    .dark tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .screen {
+      display: none;
+    }
+    
+    .warning {
+      color: #FF0000;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <!-- 確認對話框 -->
+  <div id="confirmModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <h3 class="text-xl font-bold mb-4">確認操作</h3>
+      <p id="confirmMessage" class="mb-4">確定要重置遊戲嗎？所有數據將被清除！</p>
+      <div class="flex justify-end gap-2">
+        <button id="cancelBtn" class="pixel-button px-4 py-2">取消</button>
+        <button id="confirmBtn" class="pixel-button px-4 py-2">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container mx-auto px-4 py-8 max-w-6xl">
+    <header class="text-center mb-8">
+      <h1 class="text-4xl font-bold mb-2">德國橋牌計分器</h1>
+      <div class="flex justify-center gap-2 mb-4">
+        <span class="suit spades">♠</span>
+        <span class="suit hearts">♥</span>
+        <span class="suit diamonds">♦</span>
+        <span class="suit clubs">♣</span>
+      </div>
+      <button id="toggleDarkMode" class="pixel-button px-4 py-2 text-sm">切換深色模式</button>
+    </header>
+    
+    <!-- Setup Screen -->
+    <div id="setupScreen" class="screen pixel-border p-6 mb-8 mx-auto max-w-2xl">
+      <h2 class="text-2xl font-bold mb-4">遊戲設置</h2>
+      
+      <div class="mb-6">
+        <h3 class="text-xl mb-2">玩家設置</h3>
+        <div id="playersContainer" class="mb-4 space-y-2">
+          <!-- Players will be added here -->
+        </div>
+        <div class="flex gap-2">
+          <button id="addPlayer" class="pixel-button px-4 py-2">添加玩家</button>
+          <button id="removePlayer" class="pixel-button px-4 py-2">移除玩家</button>
+        </div>
+      </div>
+      
+      <div class="mb-6">
+        <h3 class="text-xl mb-2">回合設置</h3>
+        <div class="flex flex-wrap gap-4">
+          <div>
+            <label for="startRound" class="block mb-1">起始回合:</label>
+            <input type="number" id="startRound" min="1" max="13" value="1" class="text-base">
+          </div>
+          <div>
+            <label for="endRound" class="block mb-1">結束回合:</label>
+            <input type="number" id="endRound" min="1" max="13" value="13" class="text-base">
+          </div>
+        </div>
+        <p id="roundError" class="warning mt-2 hidden">回合設置無效</p>
+      </div>
+      
+      <button id="startGame" class="pixel-button px-6 py-3 text-lg w-full">開始遊戲</button>
+    </div>
+    
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen mb-8">
+      <div class="flex justify-between items-center mb-4">
+        <div>
+          <h2 class="text-2xl font-bold">回合 <span id="currentRound">1</span> / <span id="totalRounds">13</span></h2>
+          <p>每人 <span id="cardsPerPlayer">1</span> 張牌</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="prevRound" class="pixel-button px-4 py-2">上一回合</button>
+          <button id="nextRound" class="pixel-button px-4 py-2">下一回合</button>
+        </div>
+      </div>
+      
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Trump Selection -->
+        <div class="pixel-border p-4">
+          <h3 class="text-xl font-bold mb-2">王牌選擇</h3>
+          <div class="flex gap-4">
+            <button data-suit="spades" class="trump-btn pixel-button px-4 py-2"><span class="suit spades">♠</span> 葵扇</button>
+            <button data-suit="hearts" class="trump-btn pixel-button px-4 py-2"><span class="suit hearts">♥</span> 紅心</button>
+            <button data-suit="clubs" class="trump-btn pixel-button px-4 py-2"><span class="suit clubs">♣</span> 梅花</button>
+            <button data-suit="diamonds" class="trump-btn pixel-button px-4 py-2"><span class="suit diamonds">♦</span> 方塊</button>
+          </div>
+          <div class="mt-2">
+            <p>本回合王牌: <span id="currentTrump">未選擇</span></p>
+          </div>
+        </div>
+        
+        <!-- Bid Summary -->
+        <div class="pixel-border p-4">
+          <h3 class="text-xl font-bold mb-2">叫牌總結</h3>
+          <p>玩家叫牌總和: <span id="totalBids">0</span> / <span id="totalCards">0</span></p>
+          <p id="lastPlayerWarning" class="warning hidden">最後一位玩家不能叫這個數目!</p>
+          <p id="lastPlayerRestriction" class="mt-1 hidden">最後一位玩家不能叫 <span id="restrictedBid">0</span> 墩</p>
+          <p id="bidSummaryStatus" class="mt-1 hidden"></p>
+          <p id="tricksSumWarning" class="warning mt-1 hidden">贏墩總和必須等於 <span id="requiredTricksSum">0</span> 墩!</p>
+        </div>
+      </div>
+      
+      <!-- Player Scores -->
+      <div class="mt-6 pixel-border p-4 overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr>
+              <th>玩家</th>
+              <th>叫牌</th>
+              <th>贏墩</th>
+              <th>本輪得分</th>
+              <th>總分</th>
+            </tr>
+          </thead>
+          <tbody id="scoreTableBody">
+            <!-- Player scores will be populated here -->
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="mt-6 flex justify-between">
+        <button id="showHistory" class="pixel-button px-4 py-2">查看歷史記錄</button>
+        <div>
+          <button id="newGameBtn" class="pixel-button px-4 py-2 hidden mr-2">開新遊戲</button>
+          <button id="resetGame" class="pixel-button px-4 py-2">重置遊戲</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- History Screen -->
+    <div id="historyScreen" class="screen">
+      <h2 class="text-2xl font-bold mb-4">歷史記錄</h2>
+      
+      <div class="pixel-border p-4 overflow-x-auto">
+        <table class="w-full">
+          <thead id="historyTableHead">
+            <tr>
+              <th>回合</th>
+              <th>王牌</th>
+              <!-- Player columns will be added dynamically -->
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <!-- History will be populated here -->
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="mt-6">
+        <button id="backToGame" class="pixel-button px-4 py-2">返回遊戲</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Game state
+    const gameState = {
+      players: ['玩家1', '玩家2', '玩家3', '玩家4'],
+      settings: {
+        startRound: 1,
+        endRound: 13
+      },
+      currentRoundIndex: 0,
+      rounds: []
+    };
+    
+    // DOM Elements
+    const setupScreen = document.getElementById('setupScreen');
+    const gameScreen = document.getElementById('gameScreen');
+    const historyScreen = document.getElementById('historyScreen');
+    const playersContainer = document.getElementById('playersContainer');
+    const addPlayerBtn = document.getElementById('addPlayer');
+    const removePlayerBtn = document.getElementById('removePlayer');
+    const startRoundInput = document.getElementById('startRound');
+    const endRoundInput = document.getElementById('endRound');
+    const roundError = document.getElementById('roundError');
+    const startGameBtn = document.getElementById('startGame');
+    const currentRoundSpan = document.getElementById('currentRound');
+    const totalRoundsSpan = document.getElementById('totalRounds');
+    const cardsPerPlayerSpan = document.getElementById('cardsPerPlayer');
+    const prevRoundBtn = document.getElementById('prevRound');
+    const nextRoundBtn = document.getElementById('nextRound');
+    const trumpBtns = document.querySelectorAll('.trump-btn');
+    const currentTrumpSpan = document.getElementById('currentTrump');
+    const totalBidsSpan = document.getElementById('totalBids');
+    const totalCardsSpan = document.getElementById('totalCards');
+    const lastPlayerWarningSpan = document.getElementById('lastPlayerWarning');
+    const scoreTableBody = document.getElementById('scoreTableBody');
+    const showHistoryBtn = document.getElementById('showHistory');
+    const resetGameBtn = document.getElementById('resetGame');
+    const historyTableHead = document.getElementById('historyTableHead');
+    const historyTableBody = document.getElementById('historyTableBody');
+    const backToGameBtn = document.getElementById('backToGame');
+    const toggleDarkModeBtn = document.getElementById('toggleDarkMode');
+    
+    // Initialize
+    function init() {
+      checkDarkMode();
+      toggleDarkModeBtn.addEventListener('click', toggleDarkMode);
+      
+      // Setup default players
+      renderPlayers();
+      
+      // Event listeners for setup screen
+      addPlayerBtn.addEventListener('click', addPlayer);
+      removePlayerBtn.addEventListener('click', removePlayer);
+      startRoundInput.addEventListener('change', validateRounds);
+      endRoundInput.addEventListener('change', validateRounds);
+      startGameBtn.addEventListener('click', startGame);
+      
+      // Event listeners for game screen
+      prevRoundBtn.addEventListener('click', goToPrevRound);
+      nextRoundBtn.addEventListener('click', goToNextRound);
+      trumpBtns.forEach(btn => btn.addEventListener('click', selectTrump));
+      showHistoryBtn.addEventListener('click', showHistory);
+      resetGameBtn.addEventListener('click', confirmResetGame);
+      document.getElementById('newGameBtn').addEventListener('click', () => {
+        showConfirmModal('開始新遊戲？當前資料將被保存在歷史記錄中。', resetGame);
+      });
+      
+      // Event listener for history screen
+      backToGameBtn.addEventListener('click', backToGame);
+      
+      // Show setup screen
+      showScreen(setupScreen);
+    }
+    
+    // Dark mode toggle
+    function checkDarkMode() {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+      }
+      
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+        if (event.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      });
+    }
+    
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+    }
+    
+    // Player management
+    function renderPlayers() {
+      playersContainer.innerHTML = '';
+      
+      gameState.players.forEach((player, index) => {
+        const playerDiv = document.createElement('div');
+        playerDiv.className = 'flex items-center gap-2';
+        playerDiv.innerHTML = `
+          <span class="w-20">玩家 ${index + 1}:</span>
+          <input type="text" class="player-name text-base flex-1" value="${player}" placeholder="玩家名稱">
+        `;
+        playersContainer.appendChild(playerDiv);
+      });
+      
+      updateRemoveButtonState();
+    }
+    
+    function addPlayer() {
+      if (gameState.players.length < 8) {
+        gameState.players.push(`玩家${gameState.players.length + 1}`);
+        renderPlayers();
+      }
+    }
+    
+    function removePlayer() {
+      if (gameState.players.length > 2) {
+        gameState.players.pop();
+        renderPlayers();
+      }
+    }
+    
+    function updateRemoveButtonState() {
+      removePlayerBtn.disabled = gameState.players.length <= 2;
+      removePlayerBtn.style.opacity = gameState.players.length <= 2 ? 0.5 : 1;
+    }
+    
+    // Round validation
+    function validateRounds() {
+      const startRound = parseInt(startRoundInput.value);
+      const endRound = parseInt(endRoundInput.value);
+      
+      let isValid = true;
+      if (startRound < 1 || startRound > 13 || endRound < 1 || endRound > 13 || startRound > endRound) {
+        isValid = false;
+      }
+      
+      roundError.classList.toggle('hidden', isValid);
+      startGameBtn.disabled = !isValid;
+      startGameBtn.style.opacity = isValid ? 1 : 0.5;
+      
+      return isValid;
+    }
+    
+    // Game initialization
+    function startGame() {
+      if (!validateRounds()) return;
+      
+      // Update player names
+      const playerInputs = document.querySelectorAll('.player-name');
+      playerInputs.forEach((input, index) => {
+        gameState.players[index] = input.value || `玩家${index + 1}`;
+      });
+      
+      // Set game settings
+      gameState.settings.startRound = parseInt(startRoundInput.value);
+      gameState.settings.endRound = parseInt(endRoundInput.value);
+      gameState.currentRoundIndex = 0;
+      
+      // Initialize rounds
+      initializeRounds();
+      
+      // Update UI
+      updateGameUI();
+      
+      // Show game screen
+      showScreen(gameScreen);
+    }
+    
+    function initializeRounds() {
+      gameState.rounds = [];
+      
+      for (let r = gameState.settings.startRound; r <= gameState.settings.endRound; r++) {
+        const cardsPerPlayer = r;
+        
+        const roundData = {
+          roundNumber: r,
+          cardsPerPlayer: cardsPerPlayer,
+          trump: '',
+          bids: Array(gameState.players.length).fill(0),
+          tricks: Array(gameState.players.length).fill(0),
+          scores: Array(gameState.players.length).fill(0),
+          totals: gameState.rounds.length > 0 
+            ? [...gameState.rounds[gameState.rounds.length - 1].totals] 
+            : Array(gameState.players.length).fill(0)
+        };
+        
+        gameState.rounds.push(roundData);
+      }
+    }
+    
+    // Screen navigation
+    function showScreen(screen) {
+      setupScreen.style.display = 'none';
+      gameScreen.style.display = 'none';
+      historyScreen.style.display = 'none';
+      
+      screen.style.display = 'block';
+    }
+    
+    function goToPrevRound() {
+      if (gameState.currentRoundIndex > 0) {
+        gameState.currentRoundIndex--;
+        updateGameUI();
+      }
+    }
+    
+    function goToNextRound() {
+      if (gameState.currentRoundIndex < gameState.rounds.length - 1) {
+        gameState.currentRoundIndex++;
+        updateGameUI();
+      }
+    }
+    
+    function showHistory() {
+      renderHistoryTable();
+      showScreen(historyScreen);
+    }
+    
+    function backToGame() {
+      showScreen(gameScreen);
+    }
+    
+    // Game UI updates
+    function updateGameUI() {
+      const currentRound = gameState.rounds[gameState.currentRoundIndex];
+      
+      // Update round info
+      currentRoundSpan.textContent = currentRound.roundNumber;
+      totalRoundsSpan.textContent = gameState.settings.endRound;
+      cardsPerPlayerSpan.textContent = currentRound.cardsPerPlayer;
+      
+      // Update trump display
+      updateTrumpDisplay();
+      
+      // Update bid summary
+      updateBidSummary();
+      
+      // Update score table
+      renderScoreTable();
+      
+      // Update navigation buttons
+      prevRoundBtn.disabled = gameState.currentRoundIndex === 0;
+      prevRoundBtn.style.opacity = gameState.currentRoundIndex === 0 ? 0.5 : 1;
+      
+      nextRoundBtn.disabled = gameState.currentRoundIndex === gameState.rounds.length - 1;
+      nextRoundBtn.style.opacity = gameState.currentRoundIndex === gameState.rounds.length - 1 ? 0.5 : 1;
+      
+      // 顯示/隱藏開新遊戲按鈕
+      const newGameBtn = document.getElementById('newGameBtn');
+      const isLastRound = currentRound.roundNumber === 13;
+      newGameBtn.classList.toggle('hidden', !isLastRound);
+    }
+    
+    function updateTrumpDisplay() {
+      const currentRound = gameState.rounds[gameState.currentRoundIndex];
+      
+      // Reset active state for all trump buttons
+      trumpBtns.forEach(btn => {
+        btn.classList.remove('bg-gray-300');
+      });
+      
+      // Mark current trump as active
+      if (currentRound.trump) {
+        const activeBtn = document.querySelector(`.trump-btn[data-suit="${currentRound.trump}"]`);
+        if (activeBtn) {
+          activeBtn.classList.add('bg-gray-300');
+        }
+        
+        // Update trump display
+        let trumpSymbol = '';
+        let trumpName = '';
+        
+        switch (currentRound.trump) {
+          case 'spades':
+            trumpSymbol = '♠';
+            trumpName = '葵扇';
+            break;
+          case 'hearts':
+            trumpSymbol = '♥';
+            trumpName = '紅心';
+            break;
+          case 'diamonds':
+            trumpSymbol = '♦';
+            trumpName = '方塊';
+            break;
+          case 'clubs':
+            trumpSymbol = '♣';
+            trumpName = '梅花';
+            break;
+        }
+        
+        currentTrumpSpan.innerHTML = `<span class="suit ${currentRound.trump}">${trumpSymbol}</span> ${trumpName}`;
+      } else {
+        currentTrumpSpan.textContent = '未選擇';
+      }
+    }
+    
+    function selectTrump(e) {
+      const suit = e.currentTarget.dataset.suit;
+      gameState.rounds[gameState.currentRoundIndex].trump = suit;
+      updateTrumpDisplay();
+    }
+    
+    function updateBidSummary() {
+      const currentRound = gameState.rounds[gameState.currentRoundIndex];
+      
+      const totalBids = currentRound.bids.reduce((sum, bid) => sum + bid, 0);
+      // 每位玩家手中的牌數
+      const cardsPerPlayer = currentRound.cardsPerPlayer;
+      // 所有玩家的牌數總和，等於每位玩家贏墩總和
+      const totalTricks = cardsPerPlayer * gameState.players.length;
+      
+      totalBidsSpan.textContent = totalBids;
+      totalCardsSpan.textContent = totalTricks;
+      
+      // 更新贏墩總和限制提示
+      const tricksSumWarning = document.getElementById('tricksSumWarning');
+      const requiredTricksSum = document.getElementById('requiredTricksSum');
+      
+      if (requiredTricksSum) {
+        requiredTricksSum.textContent = totalTricks;
+      }
+      
+      // 計算贏墩總和
+      const totalTricksWon = currentRound.tricks.reduce((sum, trick) => sum + trick, 0);
+      
+      // 如果有贏墩記錄，檢查總和是否等於應該的總墩數
+      const hasAnyTricks = currentRound.tricks.some(trick => trick > 0);
+      if (hasAnyTricks) {
+        tricksSumWarning.classList.toggle('hidden', totalTricksWon === totalTricks);
+      } else {
+        tricksSumWarning.classList.add('hidden');
+      }
+      
+      // 顯示最後一位玩家不能叫什麼數目
+      const lastPlayerRestriction = document.getElementById('lastPlayerRestriction');
+      const restrictedBid = document.getElementById('restrictedBid');
+      
+      // 計算前三名玩家的叫牌總和
+      const firstThreePlayersBids = currentRound.bids.slice(0, gameState.players.length - 1).reduce((sum, bid) => sum + bid, 0);
+      const nonLastPlayersWithBids = currentRound.bids.slice(0, gameState.players.length - 1).filter(bid => bid > 0).length;
+      
+      // 如果前三名玩家都輸入了叫牌，就顯示最後一名玩家的限制
+      if (nonLastPlayersWithBids === gameState.players.length - 1) {
+        const restricted = cardsPerPlayer - firstThreePlayersBids;
+        restrictedBid.textContent = restricted;
+        lastPlayerRestriction.classList.remove('hidden');
+      } else {
+        lastPlayerRestriction.classList.add('hidden');
+      }
+      
+      // 顯示"搶墩"或"餵墩"信息
+      const bidSummaryStatus = document.getElementById('bidSummaryStatus');
+      
+      // 檢查所有玩家是否都輸入了叫牌
+      const allPlayersHaveBids = currentRound.bids.every(bid => bid >= 0);
+      const atLeastOneNonZeroBid = currentRound.bids.some(bid => bid > 0);
+      
+      if (allPlayersHaveBids && atLeastOneNonZeroBid) {
+        // 搶墩/餵墩的計算是基於每人的牌數（當前回合數）
+        if (totalBids > cardsPerPlayer) {
+          bidSummaryStatus.textContent = `搶 ${totalBids - cardsPerPlayer} 墩`;
+          bidSummaryStatus.classList.remove('hidden');
+          bidSummaryStatus.classList.add('warning');
+        } else if (totalBids < cardsPerPlayer) {
+          bidSummaryStatus.textContent = `餵 ${cardsPerPlayer - totalBids} 墩`;
+          bidSummaryStatus.classList.remove('hidden');
+          bidSummaryStatus.classList.add('warning');
+        } else {
+          bidSummaryStatus.classList.add('hidden');
+        }
+      } else {
+        bidSummaryStatus.classList.add('hidden');
+      }
+    }
+    
+    function renderScoreTable() {
+      const currentRound = gameState.rounds[gameState.currentRoundIndex];
+      scoreTableBody.innerHTML = '';
+      
+      // 確定第一個叫牌的玩家索引
+      // 從當前回合數決定第一個叫牌的玩家，從玩家1開始循環
+      const firstBidderIndex = (currentRound.roundNumber - 1) % gameState.players.length;
+      
+      gameState.players.forEach((player, index) => {
+        const row = document.createElement('tr');
+        
+        // Player name
+        const nameCell = document.createElement('td');
+        nameCell.textContent = player;
+        
+        // 標記第一個叫牌的玩家
+        if (index === firstBidderIndex) {
+          nameCell.classList.add('first-bidder');
+          nameCell.title = '第一個叫牌';
+        }
+        
+        row.appendChild(nameCell);
+        
+        // Bid input
+        const bidCell = document.createElement('td');
+        const bidInput = document.createElement('input');
+        bidInput.type = 'number';
+        bidInput.className = 'text-base';
+        bidInput.min = 0;
+        bidInput.max = currentRound.cardsPerPlayer;
+        bidInput.value = currentRound.bids[index];
+        bidInput.dataset.playerIndex = index;
+        bidInput.addEventListener('change', handleBidChange);
+        bidCell.appendChild(bidInput);
+        row.appendChild(bidCell);
+        
+        // Tricks input
+        const trickCell = document.createElement('td');
+        const trickInput = document.createElement('input');
+        trickInput.type = 'number';
+        trickInput.className = 'text-base';
+        trickInput.min = 0;
+        trickInput.max = currentRound.cardsPerPlayer;
+        trickInput.value = currentRound.tricks[index];
+        trickInput.dataset.playerIndex = index;
+        trickInput.addEventListener('change', handleTrickChange);
+        trickCell.appendChild(trickInput);
+        row.appendChild(trickCell);
+        
+        // Round score
+        const scoreCell = document.createElement('td');
+        scoreCell.textContent = currentRound.scores[index];
+        if (currentRound.bids[index] === currentRound.tricks[index] && currentRound.tricks[index] > 0) {
+          scoreCell.className = 'just-made';
+        } else if (currentRound.tricks[index] !== currentRound.bids[index] && currentRound.tricks[index] > 0) {
+          scoreCell.className = 'missed';
+        }
+        row.appendChild(scoreCell);
+        
+        // Total score
+        const totalCell = document.createElement('td');
+        totalCell.textContent = currentRound.totals[index];
+        totalCell.className = 'font-bold';
+        row.appendChild(totalCell);
+        
+        scoreTableBody.appendChild(row);
+      });
+      
+      // Validate last player's bid
+      validateLastPlayerBid();
+    }
+    
+    function handleBidChange(e) {
+      const playerIndex = parseInt(e.target.dataset.playerIndex);
+      const bid = parseInt(e.target.value);
+      
+      // Validate input
+      if (isNaN(bid) || bid < 0 || bid > gameState.rounds[gameState.currentRoundIndex].cardsPerPlayer) {
+        e.target.value = gameState.rounds[gameState.currentRoundIndex].bids[playerIndex];
+        return;
+      }
+      
+      gameState.rounds[gameState.currentRoundIndex].bids[playerIndex] = bid;
+      
+      // Validate last player's bid
+      validateLastPlayerBid();
+      
+      // Update bid summary
+      updateBidSummary();
+    }
+    
+    function validateLastPlayerBid() {
+      const currentRound = gameState.rounds[gameState.currentRoundIndex];
+      const lastPlayerIndex = gameState.players.length - 1;
+      const lastPlayerBid = currentRound.bids[lastPlayerIndex];
+      
+      const otherBidsSum = currentRound.bids.slice(0, -1).reduce((sum, bid) => sum + bid, 0);
+      const restrictedBid = currentRound.cardsPerPlayer - otherBidsSum;
+      
+      // If last player's bid would make total bids equal cards per player, show warning
+      const invalid = lastPlayerBid === restrictedBid;
+      lastPlayerWarningSpan.classList.toggle('hidden', !invalid);
+      
+      // If invalid, highlight the input
+      const lastPlayerInput = document.querySelector(`input[data-player-index="${lastPlayerIndex}"]`);
+      if (lastPlayerInput) {
+        lastPlayerInput.classList.toggle('border-red-500', invalid);
+      }
+    }
+    
+    function handleTrickChange(e) {
+      const playerIndex = parseInt(e.target.dataset.playerIndex);
+      const tricks = parseInt(e.target.value);
+      
+      // Validate input
+      if (isNaN(tricks) || tricks < 0 || tricks > gameState.rounds[gameState.currentRoundIndex].cardsPerPlayer) {
+        e.target.value = gameState.rounds[gameState.currentRoundIndex].tricks[playerIndex];
+        return;
+      }
+      
+      gameState.rounds[gameState.currentRoundIndex].tricks[playerIndex] = tricks;
+      
+      // Calculate scores
+      calculateScores();
+      
+      // Update the score table
+      renderScoreTable();
+    }
+    
+    function calculateScores() {
+      const currentRound = gameState.rounds[gameState.currentRoundIndex];
+      
+      // Calculate scores for each player
+      gameState.players.forEach((player, index) => {
+        const bid = currentRound.bids[index];
+        const tricks = currentRound.tricks[index];
+        
+        let score;
+        if (bid === tricks) {
+          // Just made - 10 + bid^2
+          score = 10 + bid * bid;
+        } else {
+          // Missed - -(tricks - bid)^2
+          score = -Math.pow(tricks - bid, 2);
+        }
+        
+        currentRound.scores[index] = score;
+        
+        // Update totals
+        if (gameState.currentRoundIndex > 0) {
+          const previousRound = gameState.rounds[gameState.currentRoundIndex - 1];
+          currentRound.totals[index] = previousRound.totals[index] + score;
+        } else {
+          currentRound.totals[index] = score;
+        }
+      });
+      
+      // Update subsequent rounds' totals
+      for (let i = gameState.currentRoundIndex + 1; i < gameState.rounds.length; i++) {
+        const prevRound = gameState.rounds[i - 1];
+        
+        for (let p = 0; p < gameState.players.length; p++) {
+          gameState.rounds[i].totals[p] = prevRound.totals[p] + gameState.rounds[i].scores[p];
+        }
+      }
+    }
+    
+    // History view
+    function renderHistoryTable() {
+      // Build header
+      const headerRow = historyTableHead.querySelector('tr');
+      
+      // Clear existing player columns
+      while (headerRow.children.length > 2) {
+        headerRow.removeChild(headerRow.lastChild);
+      }
+      
+      // Add player columns
+      gameState.players.forEach(player => {
+        const th = document.createElement('th');
+        th.textContent = player;
+        headerRow.appendChild(th);
+      });
+      
+      // Build table body
+      historyTableBody.innerHTML = '';
+      
+      gameState.rounds.forEach(round => {
+        // Create a header row for the round
+        const roundHeaderRow = document.createElement('tr');
+        roundHeaderRow.className = 'bg-gray-100 dark:bg-gray-700';
+        
+        const roundCell = document.createElement('td');
+        roundCell.textContent = `回合 ${round.roundNumber}`;
+        roundCell.colSpan = 2;
+        roundCell.className = 'font-bold';
+        roundHeaderRow.appendChild(roundCell);
+        
+        gameState.players.forEach(player => {
+          const emptyCell = document.createElement('td');
+          roundHeaderRow.appendChild(emptyCell);
+        });
+        
+        historyTableBody.appendChild(roundHeaderRow);
+        
+        // Create bid row
+        const bidRow = document.createElement('tr');
+        
+        const bidLabelCell = document.createElement('td');
+        bidLabelCell.textContent = '叫牌';
+        bidLabelCell.className = 'pl-6';
+        bidRow.appendChild(bidLabelCell);
+        
+        // Trump cell
+        const trumpCell = document.createElement('td');
+        if (round.trump) {
+          let trumpSymbol = '';
+          switch (round.trump) {
+            case 'spades': trumpSymbol = '♠'; break;
+            case 'hearts': trumpSymbol = '♥'; break;
+            case 'diamonds': trumpSymbol = '♦'; break;
+            case 'clubs': trumpSymbol = '♣'; break;
+          }
+          trumpCell.innerHTML = `<span class="suit ${round.trump}">${trumpSymbol}</span>`;
+        } else {
+          trumpCell.textContent = '-';
+        }
+        bidRow.appendChild(trumpCell);
+        
+        // Player bids
+        round.bids.forEach(bid => {
+          const bidCell = document.createElement('td');
+          bidCell.textContent = bid;
+          bidRow.appendChild(bidCell);
+        });
+        
+        historyTableBody.appendChild(bidRow);
+        
+        // Create tricks row
+        const trickRow = document.createElement('tr');
+        
+        const trickLabelCell = document.createElement('td');
+        trickLabelCell.textContent = '贏墩';
+        trickLabelCell.className = 'pl-6';
+        trickRow.appendChild(trickLabelCell);
+        
+        const emptyTrumpCell = document.createElement('td');
+        trickRow.appendChild(emptyTrumpCell);
+        
+        // Player tricks
+        round.tricks.forEach(trick => {
+          const trickCell = document.createElement('td');
+          trickCell.textContent = trick;
+          trickRow.appendChild(trickCell);
+        });
+        
+        historyTableBody.appendChild(trickRow);
+        
+        // Create score row
+        const scoreRow = document.createElement('tr');
+        
+        const scoreLabelCell = document.createElement('td');
+        scoreLabelCell.textContent = '得分';
+        scoreLabelCell.className = 'pl-6';
+        scoreRow.appendChild(scoreLabelCell);
+        
+        const emptyScoreTrumpCell = document.createElement('td');
+        scoreRow.appendChild(emptyScoreTrumpCell);
+        
+        // Player scores
+        round.scores.forEach((score, index) => {
+          const scoreCell = document.createElement('td');
+          scoreCell.textContent = score;
+          
+          if (round.bids[index] === round.tricks[index] && round.tricks[index] > 0) {
+            scoreCell.className = 'just-made';
+          } else if (round.tricks[index] !== round.bids[index] && round.tricks[index] > 0) {
+            scoreCell.className = 'missed';
+          }
+          
+          scoreRow.appendChild(scoreCell);
+        });
+        
+        historyTableBody.appendChild(scoreRow);
+        
+        // Create total row
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'border-b-2 border-gray-500';
+        
+        const totalLabelCell = document.createElement('td');
+        totalLabelCell.textContent = '總分';
+        totalLabelCell.className = 'pl-6 font-bold';
+        totalRow.appendChild(totalLabelCell);
+        
+        const emptyTotalTrumpCell = document.createElement('td');
+        totalRow.appendChild(emptyTotalTrumpCell);
+        
+        // Player totals
+        round.totals.forEach(total => {
+          const totalCell = document.createElement('td');
+          totalCell.textContent = total;
+          totalCell.className = 'font-bold';
+          totalRow.appendChild(totalCell);
+        });
+        
+        historyTableBody.appendChild(totalRow);
+      });
+    }
+    
+    // 自定義確認對話框
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    
+    function showConfirmModal(message, confirmCallback) {
+      confirmMessage.textContent = message;
+      confirmModal.classList.remove('hidden');
+      
+      // 設置確認和取消按鈕的行為
+      const handleConfirm = () => {
+        confirmModal.classList.add('hidden');
+        confirmBtn.removeEventListener('click', handleConfirm);
+        cancelBtn.removeEventListener('click', handleCancel);
+        confirmCallback();
+      };
+      
+      const handleCancel = () => {
+        confirmModal.classList.add('hidden');
+        confirmBtn.removeEventListener('click', handleConfirm);
+        cancelBtn.removeEventListener('click', handleCancel);
+      };
+      
+      confirmBtn.addEventListener('click', handleConfirm);
+      cancelBtn.addEventListener('click', handleCancel);
+    }
+    
+    // Reset game
+    function confirmResetGame() {
+      showConfirmModal('確定要重置遊戲嗎？所有數據將被清除！', resetGame);
+    }
+    
+    function resetGame() {
+      showScreen(setupScreen);
+    }
+    
+    // Initialize the app
+    init();
+  </script>
+</body>
+</html>
